@@ -1,0 +1,29 @@
+{
+    "firestore": {
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    },
+    "flutter": {
+      "platforms": {
+        "android": {
+          "default": {
+            "projectId": "keyboard-arena",
+            "appId": "1:744633819126:android:376ee4c071bbcb6344f1d7",
+            "fileOutput": "android/app/google-services.json"
+          }
+        },
+        "dart": {
+          "lib/firebase_options.dart": {
+            "projectId": "keyboard-arena",
+            "configurations": {
+              "android": "1:744633819126:android:376ee4c071bbcb6344f1d7",
+              "ios": "1:744633819126:ios:50eced8a9516ed9c44f1d7",
+              "macos": "1:744633819126:ios:50eced8a9516ed9c44f1d7",
+              "web": "1:744633819126:web:0c2b3da2eb25cb2644f1d7",
+              "windows": "1:744633819126:web:9b2908cc37b665ed44f1d7"
+            }
+          }
+        }
+      }
+    }
+  }
