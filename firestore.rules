@@ -1,0 +1,158 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // 1. users 컬렉션
+    // ============================================
+    match /users/{userId} {
+      // 읽기: 누구나 가능
+      allow read: if true;
+      
+      // 쓰기: 본인만 가능
+      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // votes 서브 컬렉션: 읽기는 누구나 가능 (프로필에서 투표 목록 조회용), 쓰기는 본인만 가능
+      match /votes/{voteId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // notifications 서브 컬렉션
+      match /notifications/{notificationId} {
+        // 읽기/수정/삭제: 본인(수신자)만 가능
+        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        
+        // 생성: 로그인한 유저 누구나 가능 (댓글/공감 알림 기능 때문)
+        allow create: if request.auth != null;
+      }
+    }
+    
+    // ============================================
+    // 2. topics 컬렉션
+    // ============================================
+    match /topics/{topicId} {
+      // 읽기: 누구나 가능
+      allow read: if true;
+      
+      // 생성: 로그인한 유저만 가능
+      allow create: if request.auth != null;
+      
+      // 삭제: 글 작성자만 가능
+      allow delete: if request.auth != null && 
+                     resource.data.authorId == request.auth.uid;
+      
+      // 수정: 작성자만 수정 가능하지만, voteCounts/totalVotes는 로그인 유저 누구나 수정 가능
+      // reportCount/status/isUnderReview는 신고 기능을 위해 로그인 유저 누구나 수정 가능
+      allow update: if request.auth != null && (
+        // 작성자가 모든 필드 수정 가능
+        resource.data.authorId == request.auth.uid ||
+        // 로그인한 유저는 voteCounts와 totalVotes만 수정 가능
+        (
+          // 변경되는 필드가 voteCounts와 totalVotes만인지 확인
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voteCounts', 'totalVotes', 'updatedAt']) &&
+          // voteCounts와 totalVotes가 실제로 변경되었는지 확인
+          (request.resource.data.voteCounts is list && request.resource.data.totalVotes is int)
+        ) ||
+        // 신고 기능: reportCount, status, isUnderReview 필드만 수정 가능
+        (
+          // reportCount만 변경되는 경우
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount']) && 
+           request.resource.data.reportCount is int) ||
+          // reportCount와 status만 변경되는 경우
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'status']) && 
+           request.resource.data.reportCount is int && 
+           request.resource.data.status is string) ||
+          // reportCount, status, isUnderReview가 변경되는 경우
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'status', 'isUnderReview']) && 
+           request.resource.data.reportCount is int && 
+           request.resource.data.status is string && 
+           request.resource.data.isUnderReview is bool) ||
+          // reportCount와 isUnderReview만 변경되는 경우
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'isUnderReview']) && 
+           request.resource.data.reportCount is int && 
+           request.resource.data.isUnderReview is bool)
+        )
+      );
+      
+      // comments 서브 컬렉션
+      match /comments/{commentId} {
+        // 읽기: 누구나 가능
+        allow read: if true;
+        
+        // 생성: 로그인한 유저만 가능
+        allow create: if request.auth != null;
+        
+        // 수정: 댓글 작성자만 가능하지만, likes/likedBy/replies는 로그인 유저 누구나 수정 가능 (공감 기능 때문)
+        // reportCount/status/isUnderReview는 신고 기능을 위해 로그인 유저 누구나 수정 가능
+        allow update: if request.auth != null && (
+          // 작성자가 모든 필드 수정 가능 (예: content, isDeleted 등)
+          resource.data.uid == request.auth.uid ||
+          // 로그인한 유저는 likes, likedBy, replies만 수정 가능 (공감 기능)
+          (
+            // 변경되는 필드가 likes, likedBy, replies만인지 확인
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'replies']) &&
+            // likes는 정수이고 likedBy는 배열, replies는 배열인지 확인
+            (request.resource.data.likes is int && request.resource.data.likedBy is list && request.resource.data.replies is list)
+          ) ||
+          // 신고 기능: reportCount, status, isUnderReview 필드만 수정 가능
+          (
+            // reportCount만 변경되는 경우
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount']) && 
+             request.resource.data.reportCount is int) ||
+            // reportCount와 status만 변경되는 경우
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'status']) && 
+             request.resource.data.reportCount is int && 
+             request.resource.data.status is string) ||
+            // reportCount, status, isUnderReview가 변경되는 경우
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'status', 'isUnderReview']) && 
+             request.resource.data.reportCount is int && 
+             request.resource.data.status is string && 
+             request.resource.data.isUnderReview is bool) ||
+            // reportCount와 isUnderReview만 변경되는 경우
+            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount', 'isUnderReview']) && 
+             request.resource.data.reportCount is int && 
+             request.resource.data.isUnderReview is bool)
+          )
+        );
+        
+        // 삭제: 댓글 작성자만 가능
+        allow delete: if request.auth != null && 
+                       resource.data.uid == request.auth.uid;
+      }
+    }
+    
+    // ============================================
+    // 3. push_notifications 컬렉션 (Cloud Functions용)
+    // ============================================
+    match /push_notifications/{notificationId} {
+      // 읽기/수정/삭제: 차단 (Cloud Functions에서만 처리)
+      allow read, update, delete: if false;
+      
+      // 생성: 로그인한 유저만 가능 (클라이언트에서 푸시 알림 요청 생성)
+      allow create: if request.auth != null;
+    }
+    
+    // ============================================
+    // 4. reports 컬렉션 (신고 기능)
+    // ============================================
+    match /reports/{reportId} {
+      // 읽기: 본인이 신고한 항목만 읽기 가능 (중복 신고 체크용)
+      allow read: if request.auth != null && 
+                     resource.data.reporterId == request.auth.uid;
+      
+      // 생성: 로그인한 유저만 가능, reporterId는 본인 UID와 일치해야 함
+      allow create: if request.auth != null && 
+                      request.resource.data.reporterId == request.auth.uid &&
+                      request.resource.data.targetId is string &&
+                      request.resource.data.targetType is string &&
+                      (request.resource.data.targetType == 'topic' || request.resource.data.targetType == 'comment') &&
+                      request.resource.data.reason is string &&
+                      request.resource.data.status == 'pending';
+      
+      // 수정/삭제: 차단 (신고는 생성만 가능)
+      allow update, delete: if false;
+    }
+  }
+}
