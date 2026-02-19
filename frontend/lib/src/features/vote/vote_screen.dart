@@ -9,6 +9,7 @@ import '../report/report_dialog.dart';
 import '../block/block_service.dart'; // ★ BlockService import
 import '../../utils/notification_state.dart';
 import '../../utils/profanity_filter.dart';
+import '../../constants/app_constants.dart';
 
 // 원댓글이 삭제되었을 때 발생하는 예외
 class ParentCommentDeletedException implements Exception {
@@ -843,10 +844,13 @@ class _VoteScreenState extends State<VoteScreen>
       // 공유 텍스트 포맷팅
       final StringBuffer shareText = StringBuffer();
       shareText.writeln(title);
+      shareText.writeln(); // 빈 줄 추가
+      shareText.writeln('지금 즉시 이 게시물을 key war에서 확인하세요!!');
+      shareText.writeln(); // 빈 줄 추가
       
-      for (int i = 0; i < options.length; i++) {
-        shareText.writeln('${i + 1}. ${options[i]}');
-      }
+      shareText.writeln('앱스토어 : ${AppConstants.appStoreLink}');
+      shareText.writeln(); // 빈 줄 추가
+      shareText.writeln('구글 플레이 스토어 : ${AppConstants.playStoreLink}');
 
       final box = context.findRenderObject() as RenderBox?;
       await Share.share(
