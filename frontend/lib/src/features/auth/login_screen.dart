@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'auth_service.dart';
 import '../feed/feed_screen.dart';
 import 'nickname_screen.dart';
@@ -301,8 +301,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  // 애플 로그인 (iOS에서만 표시)
-                  if (Platform.isIOS) ...[
+                  // 애플 로그인 (iOS 및 Web에서 모두 노출)
+                  if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) ...[
                     const SizedBox(height: 12),
                     GestureDetector(
                       onTap: () =>

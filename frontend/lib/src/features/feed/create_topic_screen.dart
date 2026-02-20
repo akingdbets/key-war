@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
 import 'dart:typed_data';
 import '../../utils/profanity_filter.dart';
@@ -29,7 +30,7 @@ class _CreateTopicScreenState extends State<CreateTopicScreen> {
   ];
   
   // 각 선택지의 이미지
-  final List<File?> _optionImages = [null, null];
+  final List<XFile?> _optionImages = [null, null];
   
   // 크롭 관련 상태
   final List<CropController?> _cropControllers = [null, null];
@@ -86,18 +87,29 @@ class _CreateTopicScreenState extends State<CreateTopicScreen> {
   Future<void> _onCropComplete(int index, Uint8List croppedData) async {
     try {
       
-      // 임시 파일로 저장
-      final tempDir = Directory.systemTemp;
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final tempFile = File('${tempDir.path}/cropped_$timestamp.jpg');
-      await tempFile.writeAsBytes(croppedData);
-      
-      setState(() {
-        _optionImages[index] = tempFile;
-        _croppingImages[index] = null;
-        _croppingIndexes[index] = null;
-        _cropControllers[index] = null;
-      });
+      if (kIsWeb) {
+        // 웹에서는 파일 시스템(TempDir)이 동작 안 하므로 XFile.fromData로 메모리의 바이트 데이터를 XFile화
+        final xFile = XFile.fromData(croppedData, mimeType: 'image/jpeg');
+        setState(() {
+          _optionImages[index] = xFile;
+          _croppingImages[index] = null;
+          _croppingIndexes[index] = null;
+          _cropControllers[index] = null;
+        });
+      } else {
+        // 모바일에서는 기존대로 임시 파일 저장
+        final tempDir = Directory.systemTemp;
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final tempFile = File('${tempDir.path}/cropped_$timestamp.jpg');
+        await tempFile.writeAsBytes(croppedData);
+        
+        setState(() {
+          _optionImages[index] = XFile(tempFile.path); // XFile로 감싸기
+          _croppingImages[index] = null;
+          _croppingIndexes[index] = null;
+          _cropControllers[index] = null;
+        });
+      }
     } catch (e) {
       print("❌ 크롭 완료 처리 에러: $e");
       if (mounted) {
@@ -237,8 +249,8 @@ class _CreateTopicScreenState extends State<CreateTopicScreen> {
           try {
             print("📤 이미지 업로드 시작: 선택지 ${i + 1}");
             
-            // 파일 존재 확인
-            if (!await _optionImages[i]!.exists()) {
+            // 삭제 - File().exists()는 모바일에서만 작동하므로, _optionImages[i] == null 체크로 충분.
+            if (_optionImages[i] == null) {
               throw Exception('이미지 파일을 찾을 수 없습니다.');
             }
             
@@ -249,14 +261,29 @@ class _CreateTopicScreenState extends State<CreateTopicScreen> {
             
             print("📁 업로드 경로: $fileName");
             
-            // 업로드 실행 (타임아웃 30초)
-            final uploadTask = ref.putFile(
-              _optionImages[i]!,
-              SettableMetadata(
-                contentType: 'image/jpeg',
-                customMetadata: {'uploadedBy': user.uid},
-              ),
-            );
+            // 업로드 변수
+            UploadTask uploadTask;
+            
+            if (kIsWeb) {
+              // 웹은 File() 객체를 putFile로 전송하면 에러발생, 바이트로 putData해야함
+              final bytes = await _optionImages[i]!.readAsBytes();
+              uploadTask = ref.putData(
+                bytes,
+                SettableMetadata(
+                  contentType: 'image/jpeg',
+                  customMetadata: {'uploadedBy': user.uid},
+                ),
+              );
+            } else {
+              // 모바일은 File 객체 사용
+              uploadTask = ref.putFile(
+                File(_optionImages[i]!.path),
+                SettableMetadata(
+                  contentType: 'image/jpeg',
+                  customMetadata: {'uploadedBy': user.uid},
+                ),
+              );
+            }
             
             // 업로드 완료 대기
             await uploadTask.timeout(
@@ -519,12 +546,19 @@ class _CreateTopicScreenState extends State<CreateTopicScreen> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
-                                    child: Image.file(
-                                      _optionImages[index]!,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                      fit: BoxFit.cover, // 16:9 비율로 크롭했으므로 cover 사용
-                                    ),
+                                    child: kIsWeb 
+                                      ? Image.network(
+                                          _optionImages[index]!.path, 
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Image.file(
+                                          File(_optionImages[index]!.path),
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          fit: BoxFit.cover, // 16:9 비율로 크롭했으므로 cover 사용
+                                        ),
                                   ),
                                 ),
                               ),
